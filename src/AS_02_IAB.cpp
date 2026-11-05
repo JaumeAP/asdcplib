@@ -33,6 +33,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <iostream>
 #include <iomanip>
 #include <stdexcept>
+#include <vector>
 #include "AS_02_internal.h"
 
 namespace Kumu {
@@ -506,14 +507,22 @@ Result_t AS_02::IAB::MXFReader::GetFrameCount(ui32_t& frameCount) const {
 
 /* Anonymous namespace with ReadFrame helpers */
 namespace {
-  bool checkFrameCapacity(ASDCP::FrameBuffer& frame, size_t size, bool reallocate_if_needed) {
+  // Grows frame to at least size bytes, keeping the first used bytes already read
+  // into it: FrameBuffer::Capacity() does not preserve the contents when it reallocates.
+  bool checkFrameCapacity(ASDCP::FrameBuffer& frame, size_t size, ui32_t used, bool reallocate_if_needed) {
 
     if (frame.Capacity() < size) {
       if (!reallocate_if_needed) {
         return false;
       }
+      std::vector<byte_t> kept(frame.Data(), frame.Data() + used);
       Result_t result = frame.Capacity(size);
-      return result == RESULT_OK;
+      if (result != RESULT_OK) {
+        return false;
+      }
+      if (used > 0) {
+        memcpy(frame.Data(), &kept[0], used);
+      }
     }
     return true;
   }
@@ -553,7 +562,7 @@ namespace {
 
     ui32_t buffer_offset = 0;
 
-    if (!checkFrameCapacity(frame, preambleTLLen, reallocate_if_needed)) {
+    if (!checkFrameCapacity(frame, preambleTLLen, buffer_offset, reallocate_if_needed)) {
         return RESULT_SMALLBUF;
     }
 
@@ -575,7 +584,7 @@ namespace {
 
     if (preambleLen > 0) {
 
-      if (!checkFrameCapacity(frame, preambleTLLen + preambleLen, reallocate_if_needed)) {
+      if (!checkFrameCapacity(frame, preambleTLLen + preambleLen, buffer_offset, reallocate_if_needed)) {
         return RESULT_SMALLBUF;
       }
 
@@ -592,7 +601,7 @@ namespace {
 
     /* read the IA Frame info */
 
-    if (!checkFrameCapacity(frame,  preambleTLLen + preambleLen + frameTLLen, reallocate_if_needed)) {
+    if (!checkFrameCapacity(frame,  preambleTLLen + preambleLen + frameTLLen, buffer_offset, reallocate_if_needed)) {
       return RESULT_SMALLBUF;
     }
 
@@ -614,7 +623,7 @@ namespace {
 
     if (frameLen > 0) {
 
-      if (!checkFrameCapacity(frame, preambleTLLen + preambleLen + frameTLLen + frameLen, reallocate_if_needed)) {
+      if (!checkFrameCapacity(frame, preambleTLLen + preambleLen + frameTLLen + frameLen, buffer_offset, reallocate_if_needed)) {
         return RESULT_SMALLBUF;
       }
       frame.Size(preambleTLLen + preambleLen + frameTLLen + frameLen);

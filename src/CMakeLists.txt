@@ -231,6 +231,14 @@ if(WIN32)
 	target_link_libraries(as-02-wrap-iab general Advapi32.lib) 
 endif(WIN32)
 
+add_executable(as-02-iab-readframe-test "as-02-iab-readframe-test.cpp")
+target_link_libraries(as-02-iab-readframe-test general libas02)
+if(WIN32)
+	target_link_libraries(as-02-iab-readframe-test general Advapi32.lib)
+endif(WIN32)
+add_test(NAME as-02-iab-readframe-test
+         COMMAND as-02-iab-readframe-test ${CMAKE_CURRENT_BINARY_DIR}/as-02-iab-readframe-test.mxf)
+
 add_executable(as-02-unwrap "as-02-unwrap.cpp")
 target_link_libraries(as-02-unwrap general libas02)
 if(WIN32)
